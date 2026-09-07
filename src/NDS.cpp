@@ -685,6 +685,7 @@ bool NDS::DoSavestate(Savestate* file)
     file->Var16(&SqrtCnt);
 
     file->Var32(&CPUStop);
+    file->Var32(&ARM7BytesToWrite);
 
     for (int i = 0; i < 8; i++)
     {
