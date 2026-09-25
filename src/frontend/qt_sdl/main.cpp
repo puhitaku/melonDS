@@ -331,6 +331,17 @@ int main(int argc, char** argv)
 
     CLI::CommandLineOptions* options = CLI::ManageArgs(melon);
 
+    if (options->rtcvishConfigDir.has_value())
+    {
+        QDir dir(*options->rtcvishConfigDir);
+        if (!dir.mkpath("."))
+        {
+            printf("Cannot create config directory %s\n", qPrintable(*options->rtcvishConfigDir));
+            return 1;
+        }
+        emuDirectory = dir.absolutePath();
+    }
+
     // http://stackoverflow.com/questions/14543333/joystick-wont-work-using-sdl
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 

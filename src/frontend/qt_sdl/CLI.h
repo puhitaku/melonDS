@@ -34,6 +34,8 @@ struct CommandLineOptions
     std::optional<QString> gbaRomArchivePath;
     bool fullscreen;
     bool boot;
+    std::optional<QString> rtcvishListen;
+    std::optional<QString> rtcvishConfigDir;
 };
 
 extern CommandLineOptions* ManageArgs(QApplication& melon);

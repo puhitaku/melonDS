@@ -49,11 +49,19 @@ CommandLineOptions* ManageArgs(QApplication& melon)
     parser.addOption(QCommandLineOption({"A", "archive-file-gba"}, "Specify file to load inside an archive given (GBA)", "rom"));
 #endif
 
+    parser.addOption(QCommandLineOption("rtcvish-listen", "Start the rtcv-ish API server on HOST:PORT", "host:port"));
+    parser.addOption(QCommandLineOption("rtcvish-config-dir", "Use DIR as the config directory instead of the default", "dir"));
+
     parser.process(melon);
 
     CommandLineOptions* options = new CommandLineOptions;
 
     options->fullscreen = parser.isSet("fullscreen");
+
+    if (parser.isSet("rtcvish-listen"))
+        options->rtcvishListen = parser.value("rtcvish-listen");
+    if (parser.isSet("rtcvish-config-dir"))
+        options->rtcvishConfigDir = parser.value("rtcvish-config-dir");
 
     QStringList posargs = parser.positionalArguments();
     switch (posargs.size())
