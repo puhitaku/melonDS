@@ -58,6 +58,8 @@ set(SOURCES_QT_SDL
     CLI.h
     CLI.cpp
 
+    rtcvish_melon/MelonBackend.cpp
+
     LANDialog.cpp
     NetplayDialog.cpp
 )
@@ -98,6 +100,9 @@ add_subdirectory("../../net"
     ${CMAKE_BINARY_DIR}/net)
 
 target_link_libraries(melonDS PRIVATE net-utils)
+
+add_subdirectory(rtcvish)
+target_link_libraries(melonDS PRIVATE rtcvish)
 
 if (WIN32)
     target_link_libraries(melonDS PUBLIC opengl32)

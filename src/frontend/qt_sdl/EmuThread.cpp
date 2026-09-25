@@ -54,6 +54,7 @@
 #include "Savestate.h"
 
 #include "EmuInstance.h"
+#include "rtcvish_melon/MelonBackend.h"
 
 using namespace melonDS;
 
@@ -152,6 +153,10 @@ void EmuThread::run()
 
     while (emuStatus != emuStatus_Exit)
     {
+        MelonBackend* rtcv = rtcvish.load();
+        // frames requested by an rtcv-ish Step while paused
+        bool rtcvStep = rtcv && emuActive && emuStatus == emuStatus_Paused && rtcv->framesPending();
+
         if (emuInstance->instanceID == 0)
             MPInterface::Get().Process();
 
@@ -168,7 +173,7 @@ void EmuThread::run()
         if (emuInstance->hotkeyPressed(HK_SwapScreens)) emit swapScreensToggle();
         if (emuInstance->hotkeyPressed(HK_SwapScreenEmphasis)) emit screenEmphasisToggle();
 
-        if (emuStatus == emuStatus_Running || emuStatus == emuStatus_FrameStep)
+        if (emuStatus == emuStatus_Running || emuStatus == emuStatus_FrameStep || rtcvStep)
         {
             if (emuStatus == emuStatus_FrameStep) emuStatus = emuStatus_Paused;
 
@@ -252,10 +257,16 @@ void EmuThread::run()
             }
 
             // process input and hotkeys
-            emuInstance->nds->SetKeyMask(emuInstance->inputMask);
+            u32 keyMask = emuInstance->inputMask;
+            bool touching = emuInstance->isTouching;
+            u16 touchX = emuInstance->touchX, touchY = emuInstance->touchY;
+            if (rtcv)
+                rtcv->applyInput(keyMask, touching, touchX, touchY);
 
-            if (emuInstance->isTouching)
-                emuInstance->nds->TouchScreen(emuInstance->touchX, emuInstance->touchY);
+            emuInstance->nds->SetKeyMask(keyMask);
+
+            if (touching)
+                emuInstance->nds->TouchScreen(touchX, touchY);
             else
                 emuInstance->nds->ReleaseScreen();
 
@@ -308,7 +319,9 @@ void EmuThread::run()
             }
             else
             {
+                if (rtcv) rtcv->beforeFrame();
                 nlines = emuInstance->nds->RunFrame();
+                if (rtcv) rtcv->afterFrame();
             }
 
             if (emuInstance->ndsSave)
@@ -376,14 +389,14 @@ void EmuThread::run()
                 emuInstance->audioVolume = volumeLevel * (256.0 / 31.0);
             }
 
-            if (emuInstance->doAudioSync && !(fastforward || slowmo))
+            if (emuInstance->doAudioSync && !(fastforward || slowmo) && !rtcvStep)
                 emuInstance->audioSync();
 
             double frametimeStep = nlines / (emuInstance->curFPS * 263.0);
 
             if (frametimeStep < 0.001) frametimeStep = 0.001;
 
-            if (emuInstance->doLimitFPS)
+            if (emuInstance->doLimitFPS && !rtcvStep)
             {
                 double curtime = SDL_GetPerformanceCounter() * perfCountsSec;
 
@@ -437,12 +450,18 @@ void EmuThread::run()
             snprintf(melontitle, sizeof(melontitle), "melonDS " MELONDS_VERSION);
             changeWindowTitle(melontitle);
 
-            SDL_Delay(75);
+            if (rtcv)
+                rtcv->idleWait(75);
+            else
+                SDL_Delay(75);
 
             emuInstance->drawScreen();
         }
 
         handleMessages();
+
+        if (rtcv)
+            rtcv->poll();
     }
 }
 
@@ -485,12 +504,7 @@ void EmuThread::handleMessages()
             break;
 
         case msg_EmuRun:
-            emuStatus = emuStatus_Running;
-            emuPauseStack = emuPauseStackRunning;
-            emuActive = true;
-
-            emuInstance->audioEnable();
-            emit windowEmuStart();
+            runNow();
             break;
 
         case msg_EmuPause:
@@ -525,13 +539,8 @@ void EmuThread::handleMessages()
             break;
 
         case msg_EmuStop:
-            if (msg.param.value<bool>())
-                emuInstance->nds->Stop();
-            emuStatus = emuStatus_Paused;
-            emuActive = false;
-
-            emuInstance->audioDisable();
-            emit windowEmuStop();
+            stopNow(msg.param.value<bool>());
+            if (MelonBackend* rtcv = rtcvish.load()) rtcv->onConsoleStopped();
             break;
 
         case msg_EmuFrameStep:
@@ -539,15 +548,8 @@ void EmuThread::handleMessages()
             break;
 
         case msg_EmuReset:
-            emuInstance->reset();
-
-            emuStatus = emuStatus_Running;
-            emuPauseStack = emuPauseStackRunning;
-            emuActive = true;
-
-            emuInstance->audioEnable();
-            emit windowEmuReset();
-            emuInstance->osdAddMessage(0, "Reset");
+            resetNow();
+            if (MelonBackend* rtcv = rtcvish.load()) rtcv->onConsoleReset(false);
             break;
 
         case msg_InitGL:
@@ -574,6 +576,7 @@ void EmuThread::handleMessages()
             assert(emuInstance->nds != nullptr);
             emuInstance->nds->Start();
             msgResult = 1;
+            if (MelonBackend* rtcv = rtcvish.load()) rtcv->onConsoleReset(true);
             break;
 
         case msg_BootFirmware:
@@ -584,6 +587,7 @@ void EmuThread::handleMessages()
             assert(emuInstance->nds != nullptr);
             emuInstance->nds->Start();
             msgResult = 1;
+            if (MelonBackend* rtcv = rtcvish.load()) rtcv->onConsoleReset(true);
             break;
 
         case msg_InsertCart:
@@ -664,6 +668,65 @@ void EmuThread::handleMessages()
         glBorrowCond.wait(&glBorrowMutex);
         glBorrowMutex.unlock();
     }
+}
+
+void EmuThread::runNow()
+{
+    emuStatus = emuStatus_Running;
+    emuPauseStack = emuPauseStackRunning;
+    emuActive = true;
+
+    emuInstance->audioEnable();
+    emit windowEmuStart();
+}
+
+void EmuThread::stopNow(bool external)
+{
+    if (external)
+        emuInstance->nds->Stop();
+    emuStatus = emuStatus_Paused;
+    emuActive = false;
+
+    emuInstance->audioDisable();
+    emit windowEmuStop();
+}
+
+void EmuThread::resetNow()
+{
+    emuInstance->reset();
+
+    emuStatus = emuStatus_Running;
+    emuPauseStack = emuPauseStackRunning;
+    emuActive = true;
+
+    emuInstance->audioEnable();
+    emit windowEmuReset();
+    emuInstance->osdAddMessage(0, "Reset");
+}
+
+void EmuThread::pauseNow()
+{
+    if (emuStatus == emuStatus_Paused) return;
+
+    emuPauseStack = emuPauseStackPauseThreshold;
+    prevEmuStatus = emuStatus_Running;
+    emuStatus = emuStatus_Paused;
+
+    emuInstance->audioDisable();
+    emit windowEmuPause(true);
+    emuInstance->osdAddMessage(0, "Paused");
+}
+
+void EmuThread::unpauseNow()
+{
+    if (emuStatus != emuStatus_Paused || !emuActive) return;
+
+    emuPauseStack = emuPauseStackRunning;
+    emuStatus = emuStatus_Running;
+
+    emuInstance->audioEnable();
+    emit windowEmuPause(false);
+    emuInstance->osdAddMessage(0, "Resumed");
 }
 
 void EmuThread::changeWindowTitle(char* title)

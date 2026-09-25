@@ -42,6 +42,7 @@ class NDS;
 class EmuInstance;
 class MainWindow;
 class ScreenPanelGL;
+class MelonBackend;
 
 class EmuThread : public QThread
 {
@@ -135,6 +136,9 @@ public:
     void borrowGL();
     void returnGL();
     void updateVideoSettings() { videoSettingsDirty = true; }
+
+    // rtcv-ish API server hooks; null unless --rtcvish-listen is given.
+    void setRtcvish(MelonBackend* backend) { rtcvish = backend; }
     void updateVideoRenderer() { videoSettingsDirty = true; lastVideoRenderer = -1; }
 
     QWaitCondition glBorrowCond;
@@ -161,7 +165,17 @@ signals:
     void syncVolumeLevel();
 
 private:
+    friend class MelonBackend;
+
     void handleMessages();
+
+    // Message handler bodies, callable directly on the emu thread.
+    void runNow();
+    void stopNow(bool external);
+    void resetNow();
+    // Idempotent pause/unpause that bypass the pause stack (rtcv-ish).
+    void pauseNow();
+    void unpauseNow();
 
     void updateRenderer();
     void compileShaders();
@@ -200,6 +214,8 @@ private:
     bool useOpenGL;
     int videoRenderer;
     bool videoSettingsDirty;
+
+    std::atomic<MelonBackend*> rtcvish{nullptr};
 };
 
 #endif // EMUTHREAD_H

@@ -380,6 +380,7 @@ private:
 
     friend class EmuThread;
     friend class MainWindow;
+    friend class MelonBackend;
 };
 
 #endif //EMUINSTANCE_H

@@ -65,6 +65,8 @@
 #include "Net_PCap.h"
 #include "Net_Slirp.h"
 
+#include "rtcvish_melon/MelonBackend.h"
+
 using namespace melonDS;
 
 QString* systemThemeName;
@@ -342,6 +344,19 @@ int main(int argc, char** argv)
         emuDirectory = dir.absolutePath();
     }
 
+    std::unique_ptr<MelonBackend> rtcvish;
+    if (options->rtcvishListen.has_value())
+    {
+        rtcvish = std::make_unique<MelonBackend>();
+        QString err;
+        if (!rtcvish->start(*options->rtcvishListen, err))
+        {
+            printf("rtcv-ish: %s\n", qPrintable(err));
+            return 1;
+        }
+        printf("rtcv-ish: listening on %s\n", qPrintable(*options->rtcvishListen));
+    }
+
     // http://stackoverflow.com/questions/14543333/joystick-wont-work-using-sdl
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
 
@@ -407,6 +422,9 @@ int main(int argc, char** argv)
 
     createEmuInstance();
 
+    if (rtcvish)
+        rtcvish->attach(emuInstances[0]);
+
     {
         MainWindow* win = emuInstances[0]->getMainWindow();
         bool memberSyntaxUsed = false;
@@ -442,6 +460,8 @@ int main(int argc, char** argv)
     // if we get here, all the existing emu instances should have been deleted already
     // but with this we make extra sure they are all deleted
     deleteAllEmuInstances();
+
+    rtcvish.reset();
 
     delete camManager[0];
     delete camManager[1];
