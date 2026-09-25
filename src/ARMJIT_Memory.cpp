@@ -505,10 +505,63 @@ void ARMJIT_Memory::Mapping::Unmap(int region, melonDS::NDS& nds) noexcept
 #endif
 }
 
+bool ARMJIT_Memory::IsPageFrozen(int region, u32 offset) const noexcept
+{
+#if defined(__SWITCH__)
+    return false;
+#else
+    if (!NDS.Freeze.Active() || OffsetsPerRegion[region] == UINT32_MAX)
+        return false;
+    return NDS.Freeze.HostFrozen(MemoryBase + OffsetsPerRegion[region] + offset, PageSize);
+#endif
+}
+
+void ARMJIT_Memory::RefreshFreezeProtection() noexcept
+{
+#if !defined(__SWITCH__)
+    if (PageSize == 0)
+        return;
+
+    for (int region = 0; region < memregions_Count; region++)
+    {
+        AddressRange* code = NDS.JIT.CodeMemRegions[region];
+        for (int i = 0; i < Mappings[region].Length; i++)
+        {
+            Mapping& mapping = Mappings[region][i];
+            u8* states = mapping.Num == 0 ? MappingStatus9 : MappingStatus7;
+            for (u32 offset = 0; offset < mapping.Size; offset += PageSize)
+            {
+                u32 addr = mapping.Addr + offset;
+                u8 state = states[addr >> PageShift];
+                if (state == memstate_Unmapped)
+                    continue;
+                if (mapping.Num == 0
+                    && region != memregion_DTCM
+                    && (addr & NDS.ARM9.DTCMMask) == NDS.ARM9.DTCMBase)
+                    continue;
+
+                u32 local = mapping.LocalOffset + offset;
+                bool protect = (code && PageContainsCode(&code[local / 512], PageSize)) || IsPageFrozen(region, local);
+                u8 want = protect ? memstate_MappedProtected : memstate_MappedRW;
+                if (state == want)
+                    continue;
+                states[addr >> PageShift] = want;
+                SetCodeProtectionRange(addr, PageSize, mapping.Num, protect ? 1 : 2);
+            }
+        }
+    }
+#endif
+}
+
 void ARMJIT_Memory::SetCodeProtection(int region, u32 offset, bool protect) noexcept
 {
     offset &= ~(PageSize - 1);
     //printf("set code protection %d %x %d\n", region, offset, protect);
+
+    // Frozen pages stay write-protected whether they contain code or not, so
+    // that fastmem writes to them fault and take the slow path.
+    if (IsPageFrozen(region, offset))
+        return;
 
     for (int i = 0; i < Mappings[region].Length; i++)
     {
@@ -709,10 +762,16 @@ bool ARMJIT_Memory::MapAtAddress(u32 addr) noexcept
         }
         else
         {
+            // Pages holding code or frozen bytes are mapped write-protected.
+            auto isProtected = [&](u32 off)
+            {
+                return (isExecutable && PageContainsCode(&range[off / 512], PageSize))
+                    || IsPageFrozen(region, memoryOffset + off);
+            };
             u32 sectionOffset = offset;
-            bool hasCode = isExecutable && PageContainsCode(&range[offset / 512], PageSize);
+            bool hasCode = isProtected(offset);
             while (offset < mirrorSize
-                && (!isExecutable || PageContainsCode(&range[offset / 512], PageSize) == hasCode)
+                && isProtected(offset) == hasCode
                 && (!skipDTCM || mirrorStart + offset != NDS.ARM9.DTCMBase))
             {
                 assert(states[(mirrorStart + offset) >> PageShift] == memstate_Unmapped);

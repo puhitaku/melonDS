@@ -109,6 +109,11 @@ public:
     void RemapSWRAM() noexcept;
     void RemapNWRAM(int num) noexcept;
     void SetCodeProtection(int region, u32 offset, bool protect) noexcept;
+    // Write-protect the fastmem pages holding bytes of NDS::Freeze (and
+    // unprotect the ones no longer frozen, unless they hold code), so that
+    // compiled code writing them faults and is rewritten to the slow path,
+    // where the freeze applies.
+    void RefreshFreezeProtection() noexcept;
 
     [[nodiscard]] u8* GetMainRAM() noexcept { return MemoryBase + MemBlockMainRAMOffset; }
     [[nodiscard]] const u8* GetMainRAM() const noexcept { return MemoryBase + MemBlockMainRAMOffset; }
@@ -166,6 +171,7 @@ private:
     bool MapIntoRange(u32 addr, u32 num, u32 offset, u32 size) noexcept;
     bool UnmapFromRange(u32 addr, u32 num, u32 offset, u32 size) noexcept;
     void SetCodeProtectionRange(u32 addr, u32 size, u32 num, int protection) noexcept;
+    bool IsPageFrozen(int region, u32 offset) const noexcept;
 
     melonDS::NDS& NDS;
     void* FastMem9Start;
@@ -210,6 +216,7 @@ public:
     void RemapSWRAM() noexcept {}
     void RemapNWRAM(int num) noexcept {}
     void SetCodeProtection(int region, u32 offset, bool protect) noexcept {}
+    void RefreshFreezeProtection() noexcept {}
 
     [[nodiscard]] u8* GetMainRAM() noexcept { return MainRAM.data(); }
     [[nodiscard]] const u8* GetMainRAM() const noexcept { return MainRAM.data(); }
