@@ -249,8 +249,28 @@ void MelonBackend::updateRomPathFromInstance()
         romPath = inst->baseROMDir + "/" + inst->baseROMName;
 }
 
+const void* MelonBackend::currentCart() const
+{
+    return active() ? inst->nds->NDSCartSlot.GetCart() : nullptr;
+}
+
 void MelonBackend::poll()
 {
+    // Carts inserted or ejected from the UI while running change the game
+    // and the CartROM domain without resetting the console.
+    if (const void* cart = currentCart(); cart != lastCart)
+    {
+        lastCart = cart;
+        if (cart) updateRomPathFromInstance();
+        else romPath.clear();
+        server.scheduler().clear();
+        forceStatus = true;
+    }
+    if (uint64_t size = active() ? uint64_t(inst->nds->MainRAMMask) + 1 : 0; size != lastMainRAMSize)
+    {
+        lastMainRAMSize = size;
+        forceStatus = true;
+    }
     if (forceStatus)
     {
         forceStatus = false;
@@ -293,6 +313,7 @@ void MelonBackend::onConsoleReset(bool romChanged)
     frame = 0;
     server.scheduler().clear();
     if (romChanged) updateRomPathFromInstance();
+    lastCart = currentCart();
     forceStatus = true;
 }
 
@@ -300,6 +321,7 @@ void MelonBackend::onConsoleStopped()
 {
     framesToRun = 0;
     server.scheduler().clear();
+    lastCart = currentCart();
     forceStatus = true;
 }
 
@@ -491,6 +513,7 @@ bool MelonBackend::loadRom(const std::string& path, rtcvish::Error& err)
     frame = 0;
     framesToRun = 0;
     romPath = path;
+    lastCart = currentCart();
     return true;
 }
 
@@ -511,6 +534,7 @@ bool MelonBackend::reset(rtcvish::Error& err)
     thread->resetNow();
     if (paused) thread->pauseNow();
     frame = 0;
+    lastCart = currentCart();
     return true;
 }
 

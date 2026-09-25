@@ -91,6 +91,7 @@ public:
 private:
     bool active() const;
     void updateRomPathFromInstance();
+    const void* currentCart() const;
 
     rtcvish::Server server;
     EmuInstance* inst = nullptr;
@@ -100,6 +101,11 @@ private:
     uint32_t framesToRun = 0;
     bool forceStatus = false;
     std::string romPath;
+    // The DS cart seen last; the UI can insert or eject one without a hook.
+    const void* lastCart = nullptr;
+    // DSi MainRAM switches between 16 and 4 MiB when the game writes
+    // SCFG_EXT (e.g. a DS game launched from the DSi menu).
+    uint64_t lastMainRAMSize = 0;
 
     bool inputOverride = false;
     rtcvish::Input input;
