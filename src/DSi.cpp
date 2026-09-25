@@ -1677,7 +1677,7 @@ void DSi::ARM9Write8(u32 addr, u8 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_A[page * 0x10000];
-                    *(u8*)&ptr[addr & 0xFFFF] = val;
+                    Freeze.Store<u8>(&ptr[addr & 0xFFFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_A>(addr);
                 }
                 return;
@@ -1695,7 +1695,7 @@ void DSi::ARM9Write8(u32 addr, u8 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_B[page * 0x8000];
-                    *(u8*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u8>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_B>(addr);
                 }
                 return;
@@ -1713,7 +1713,7 @@ void DSi::ARM9Write8(u32 addr, u8 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_C[page * 0x8000];
-                    *(u8*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u8>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_C>(addr);
                 }
                 return;
@@ -1728,6 +1728,7 @@ void DSi::ARM9Write8(u32 addr, u8 val)
     case 0x06000000:
         if (!(SCFG_EXT[0] & (1<<13))) return;
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_VRAM>(addr);
+        val = FilterVRAMWrite9(addr, val);
         switch (addr & 0x00E00000)
         {
         case 0x00000000: GPU.SyncVRAM_ABG(addr, true); GPU.WriteVRAM_ABG<u8>(addr, val); return;
@@ -1744,7 +1745,7 @@ void DSi::ARM9Write8(u32 addr, u8 val)
 
     case 0x0C000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u8*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u8>(&MainRAM[addr & MainRAMMask], val);
         return;
     }
 
@@ -1774,7 +1775,7 @@ void DSi::ARM9Write16(u32 addr, u16 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_A[page * 0x10000];
-                    *(u16*)&ptr[addr & 0xFFFF] = val;
+                    Freeze.Store<u16>(&ptr[addr & 0xFFFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_A>(addr);
                 }
                 return;
@@ -1792,7 +1793,7 @@ void DSi::ARM9Write16(u32 addr, u16 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_B[page * 0x8000];
-                    *(u16*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u16>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_B>(addr);
                 }
                 return;
@@ -1810,7 +1811,7 @@ void DSi::ARM9Write16(u32 addr, u16 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_C[page * 0x8000];
-                    *(u16*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u16>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_C>(addr);
                 }
                 return;
@@ -1829,7 +1830,7 @@ void DSi::ARM9Write16(u32 addr, u16 val)
 
     case 0x0C000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u16*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u16>(&MainRAM[addr & MainRAMMask], val);
         return;
     }
 
@@ -1859,7 +1860,7 @@ void DSi::ARM9Write32(u32 addr, u32 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_A[page * 0x10000];
-                    *(u32*)&ptr[addr & 0xFFFF] = val;
+                    Freeze.Store<u32>(&ptr[addr & 0xFFFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_A>(addr);
                 }
                 return;
@@ -1877,7 +1878,7 @@ void DSi::ARM9Write32(u32 addr, u32 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_B[page * 0x8000];
-                    *(u32*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u32>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_B>(addr);
                 }
                 return;
@@ -1895,7 +1896,7 @@ void DSi::ARM9Write32(u32 addr, u32 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_C[page * 0x8000];
-                    *(u32*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u32>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_NewSharedWRAM_C>(addr);
                 }
                 return;
@@ -1914,7 +1915,7 @@ void DSi::ARM9Write32(u32 addr, u32 val)
 
     case 0x0C000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u32*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u32>(&MainRAM[addr & MainRAMMask], val);
         return;
     }
 
@@ -2158,7 +2159,7 @@ void DSi::ARM7Write8(u32 addr, u8 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_A[page * 0x10000];
-                    *(u8*)&ptr[addr & 0xFFFF] = val;
+                    Freeze.Store<u8>(&ptr[addr & 0xFFFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_A>(addr);
                 }
                 return;
@@ -2176,7 +2177,7 @@ void DSi::ARM7Write8(u32 addr, u8 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_B[page * 0x8000];
-                    *(u8*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u8>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_B>(addr);
                 }
                 return;
@@ -2194,7 +2195,7 @@ void DSi::ARM7Write8(u32 addr, u8 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_C[page * 0x8000];
-                    *(u8*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u8>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_C>(addr);
                 }
                 return;
@@ -2217,7 +2218,7 @@ void DSi::ARM7Write8(u32 addr, u8 val)
     case 0x0C000000:
     case 0x0C800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u8*)&NDS::MainRAM[addr & NDS::MainRAMMask] = val;
+        Freeze.Store<u8>(&NDS::MainRAM[addr & NDS::MainRAMMask], val);
         return;
     }
 
@@ -2248,7 +2249,7 @@ void DSi::ARM7Write16(u32 addr, u16 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_A[page * 0x10000];
-                    *(u16*)&ptr[addr & 0xFFFF] = val;
+                    Freeze.Store<u16>(&ptr[addr & 0xFFFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_A>(addr);
                 }
                 return;
@@ -2266,7 +2267,7 @@ void DSi::ARM7Write16(u32 addr, u16 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_B[page * 0x8000];
-                    *(u16*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u16>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_B>(addr);
                 }
                 return;
@@ -2284,7 +2285,7 @@ void DSi::ARM7Write16(u32 addr, u16 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_C[page * 0x8000];
-                    *(u16*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u16>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_C>(addr);
                 }
                 return;
@@ -2307,7 +2308,7 @@ void DSi::ARM7Write16(u32 addr, u16 val)
     case 0x0C000000:
     case 0x0C800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u16*)&NDS::MainRAM[addr & NDS::MainRAMMask] = val;
+        Freeze.Store<u16>(&NDS::MainRAM[addr & NDS::MainRAMMask], val);
         return;
     }
 
@@ -2338,7 +2339,7 @@ void DSi::ARM7Write32(u32 addr, u32 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_A[page * 0x10000];
-                    *(u32*)&ptr[addr & 0xFFFF] = val;
+                    Freeze.Store<u32>(&ptr[addr & 0xFFFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_A>(addr);
                 }
                 return;
@@ -2356,7 +2357,7 @@ void DSi::ARM7Write32(u32 addr, u32 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_B[page * 0x8000];
-                    *(u32*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u32>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_B>(addr);
                 }
                 return;
@@ -2374,7 +2375,7 @@ void DSi::ARM7Write32(u32 addr, u32 val)
                     if (bankInfo != destPartSetting)
                         continue;
                     u8* ptr = &NWRAM_C[page * 0x8000];
-                    *(u32*)&ptr[addr & 0x7FFF] = val;
+                    Freeze.Store<u32>(&ptr[addr & 0x7FFF], val);
                     JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_NewSharedWRAM_C>(addr);
                 }
                 return;
@@ -2397,7 +2398,7 @@ void DSi::ARM7Write32(u32 addr, u32 val)
     case 0x0C000000:
     case 0x0C800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u32*)&NDS::MainRAM[addr & NDS::MainRAMMask] = val;
+        Freeze.Store<u32>(&NDS::MainRAM[addr & NDS::MainRAMMask], val);
         return;
     }
 

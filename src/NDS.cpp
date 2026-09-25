@@ -2163,14 +2163,14 @@ void NDS::ARM9Write8(u32 addr, u8 val)
     {
     case 0x02000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u8*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u8>(&MainRAM[addr & MainRAMMask], val);
         return;
 
     case 0x03000000:
         if (SWRAM_ARM9.Mem)
         {
             JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_SharedWRAM>(addr);
-            *(u8*)&SWRAM_ARM9.Mem[addr & SWRAM_ARM9.Mask] = val;
+            Freeze.Store<u8>(&SWRAM_ARM9.Mem[addr & SWRAM_ARM9.Mask], val);
         }
         return;
 
@@ -2204,14 +2204,14 @@ void NDS::ARM9Write16(u32 addr, u16 val)
     {
     case 0x02000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u16*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u16>(&MainRAM[addr & MainRAMMask], val);
         return;
 
     case 0x03000000:
         if (SWRAM_ARM9.Mem)
         {
             JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_SharedWRAM>(addr);
-            *(u16*)&SWRAM_ARM9.Mem[addr & SWRAM_ARM9.Mask] = val;
+            Freeze.Store<u16>(&SWRAM_ARM9.Mem[addr & SWRAM_ARM9.Mask], val);
         }
         return;
 
@@ -2221,11 +2221,13 @@ void NDS::ARM9Write16(u32 addr, u16 val)
 
     case 0x05000000:
         if (!(PowerControl9 & ((addr & 0x400) ? (1<<9) : (1<<1)))) return;
+        if (Freeze.Active()) val = Freeze.FilterHost<u16>(&GPU.Palette[addr & 0x7FF], val);
         GPU.WritePalette<u16>(addr, val);
         return;
 
     case 0x06000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_VRAM>(addr);
+        val = FilterVRAMWrite9(addr, val);
         switch (addr & 0x00E00000)
         {
         case 0x00000000: GPU.SyncVRAM_ABG(addr, true); GPU.WriteVRAM_ABG<u16>(addr, val); return;
@@ -2237,6 +2239,7 @@ void NDS::ARM9Write16(u32 addr, u16 val)
 
     case 0x07000000:
         if (!(PowerControl9 & ((addr & 0x400) ? (1<<9) : (1<<1)))) return;
+        if (Freeze.Active()) val = Freeze.FilterHost<u16>(&GPU.OAM[addr & 0x7FF], val);
         GPU.WriteOAM<u16>(addr, val);
         return;
 
@@ -2264,14 +2267,14 @@ void NDS::ARM9Write32(u32 addr, u32 val)
     {
     case 0x02000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u32*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u32>(&MainRAM[addr & MainRAMMask], val);
         return ;
 
     case 0x03000000:
         if (SWRAM_ARM9.Mem)
         {
             JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_SharedWRAM>(addr);
-            *(u32*)&SWRAM_ARM9.Mem[addr & SWRAM_ARM9.Mask] = val;
+            Freeze.Store<u32>(&SWRAM_ARM9.Mem[addr & SWRAM_ARM9.Mask], val);
         }
         return;
 
@@ -2281,11 +2284,13 @@ void NDS::ARM9Write32(u32 addr, u32 val)
 
     case 0x05000000:
         if (!(PowerControl9 & ((addr & 0x400) ? (1<<9) : (1<<1)))) return;
+        if (Freeze.Active()) val = Freeze.FilterHost<u32>(&GPU.Palette[addr & 0x7FF], val);
         GPU.WritePalette(addr, val);
         return;
 
     case 0x06000000:
         JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_VRAM>(addr);
+        val = FilterVRAMWrite9(addr, val);
         switch (addr & 0x00E00000)
         {
         case 0x00000000: GPU.SyncVRAM_ABG(addr, true); GPU.WriteVRAM_ABG<u32>(addr, val); return;
@@ -2297,6 +2302,7 @@ void NDS::ARM9Write32(u32 addr, u32 val)
 
     case 0x07000000:
         if (!(PowerControl9 & ((addr & 0x400) ? (1<<9) : (1<<1)))) return;
+        if (Freeze.Active()) val = Freeze.FilterHost<u32>(&GPU.OAM[addr & 0x7FF], val);
         GPU.WriteOAM<u32>(addr, val);
         return;
 
@@ -2559,26 +2565,26 @@ void NDS::ARM7Write8(u32 addr, u8 val)
     case 0x02000000:
     case 0x02800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u8*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u8>(&MainRAM[addr & MainRAMMask], val);
         return;
 
     case 0x03000000:
         if (SWRAM_ARM7.Mem)
         {
             JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_SharedWRAM>(addr);
-            *(u8*)&SWRAM_ARM7.Mem[addr & SWRAM_ARM7.Mask] = val;
+            Freeze.Store<u8>(&SWRAM_ARM7.Mem[addr & SWRAM_ARM7.Mask], val);
             return;
         }
         else
         {
             JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_WRAM7>(addr);
-            *(u8*)&ARM7WRAM[addr & (ARM7WRAMSize - 1)] = val;
+            Freeze.Store<u8>(&ARM7WRAM[addr & (ARM7WRAMSize - 1)], val);
             return;
         }
 
     case 0x03800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_WRAM7>(addr);
-        *(u8*)&ARM7WRAM[addr & (ARM7WRAMSize - 1)] = val;
+        Freeze.Store<u8>(&ARM7WRAM[addr & (ARM7WRAMSize - 1)], val);
         return;
 
     case 0x04000000:
@@ -2618,26 +2624,26 @@ void NDS::ARM7Write16(u32 addr, u16 val)
     case 0x02000000:
     case 0x02800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u16*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u16>(&MainRAM[addr & MainRAMMask], val);
         return;
 
     case 0x03000000:
         if (SWRAM_ARM7.Mem)
         {
             JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_SharedWRAM>(addr);
-            *(u16*)&SWRAM_ARM7.Mem[addr & SWRAM_ARM7.Mask] = val;
+            Freeze.Store<u16>(&SWRAM_ARM7.Mem[addr & SWRAM_ARM7.Mask], val);
             return;
         }
         else
         {
             JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_WRAM7>(addr);
-            *(u16*)&ARM7WRAM[addr & (ARM7WRAMSize - 1)] = val;
+            Freeze.Store<u16>(&ARM7WRAM[addr & (ARM7WRAMSize - 1)], val);
             return;
         }
 
     case 0x03800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_WRAM7>(addr);
-        *(u16*)&ARM7WRAM[addr & (ARM7WRAMSize - 1)] = val;
+        Freeze.Store<u16>(&ARM7WRAM[addr & (ARM7WRAMSize - 1)], val);
         return;
 
     case 0x04000000:
@@ -2688,26 +2694,26 @@ void NDS::ARM7Write32(u32 addr, u32 val)
     case 0x02000000:
     case 0x02800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_MainRAM>(addr);
-        *(u32*)&MainRAM[addr & MainRAMMask] = val;
+        Freeze.Store<u32>(&MainRAM[addr & MainRAMMask], val);
         return;
 
     case 0x03000000:
         if (SWRAM_ARM7.Mem)
         {
             JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_SharedWRAM>(addr);
-            *(u32*)&SWRAM_ARM7.Mem[addr & SWRAM_ARM7.Mask] = val;
+            Freeze.Store<u32>(&SWRAM_ARM7.Mem[addr & SWRAM_ARM7.Mask], val);
             return;
         }
         else
         {
             JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_WRAM7>(addr);
-            *(u32*)&ARM7WRAM[addr & (ARM7WRAMSize - 1)] = val;
+            Freeze.Store<u32>(&ARM7WRAM[addr & (ARM7WRAMSize - 1)], val);
             return;
         }
 
     case 0x03800000:
         JIT.CheckAndInvalidate<1, ARMJIT_Memory::memregion_WRAM7>(addr);
-        *(u32*)&ARM7WRAM[addr & (ARM7WRAMSize - 1)] = val;
+        Freeze.Store<u32>(&ARM7WRAM[addr & (ARM7WRAMSize - 1)], val);
         return;
 
     case 0x04000000:

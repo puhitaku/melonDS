@@ -1378,6 +1378,7 @@ u32 WifiRead32(u32 addr)
 template <typename T>
 void VRAMWrite(u32 addr, T val)
 {
+    val = NDS::Current->FilterVRAMWrite9(addr, val);
     switch (addr & 0x00E00000)
     {
     case 0x00000000: NDS::Current->GPU.SyncVRAM_ABG(addr, true); NDS::Current->GPU.WriteVRAM_ABG<T>(addr, val); return;

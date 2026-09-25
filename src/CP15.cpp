@@ -934,14 +934,14 @@ void ARMv5::DataWrite8(u32 addr, u8 val)
     if (addr < ITCMSize)
     {
         DataCycles = 1;
-        *(u8*)&ITCM[addr & (ITCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u8>(&ITCM[addr & (ITCMPhysicalSize - 1)], val);
         NDS.JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_ITCM>(addr);
         return;
     }
     if ((addr & DTCMMask) == DTCMBase)
     {
         DataCycles = 1;
-        *(u8*)&DTCM[addr & (DTCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u8>(&DTCM[addr & (DTCMPhysicalSize - 1)], val);
         return;
     }
 
@@ -964,14 +964,14 @@ void ARMv5::DataWrite16(u32 addr, u16 val)
     if (addr < ITCMSize)
     {
         DataCycles = 1;
-        *(u16*)&ITCM[addr & (ITCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u16>(&ITCM[addr & (ITCMPhysicalSize - 1)], val);
         NDS.JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_ITCM>(addr);
         return;
     }
     if ((addr & DTCMMask) == DTCMBase)
     {
         DataCycles = 1;
-        *(u16*)&DTCM[addr & (DTCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u16>(&DTCM[addr & (DTCMPhysicalSize - 1)], val);
         return;
     }
 
@@ -994,14 +994,14 @@ void ARMv5::DataWrite32(u32 addr, u32 val)
     if (addr < ITCMSize)
     {
         DataCycles = 1;
-        *(u32*)&ITCM[addr & (ITCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u32>(&ITCM[addr & (ITCMPhysicalSize - 1)], val);
         NDS.JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_ITCM>(addr);
         return;
     }
     if ((addr & DTCMMask) == DTCMBase)
     {
         DataCycles = 1;
-        *(u32*)&DTCM[addr & (DTCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u32>(&DTCM[addr & (DTCMPhysicalSize - 1)], val);
         return;
     }
 
@@ -1016,7 +1016,7 @@ void ARMv5::DataWrite32S(u32 addr, u32 val)
     if (addr < ITCMSize)
     {
         DataCycles += 1;
-        *(u32*)&ITCM[addr & (ITCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u32>(&ITCM[addr & (ITCMPhysicalSize - 1)], val);
 #ifdef JIT_ENABLED
         NDS.JIT.CheckAndInvalidate<0, ARMJIT_Memory::memregion_ITCM>(addr);
 #endif
@@ -1025,7 +1025,7 @@ void ARMv5::DataWrite32S(u32 addr, u32 val)
     if ((addr & DTCMMask) == DTCMBase)
     {
         DataCycles += 1;
-        *(u32*)&DTCM[addr & (DTCMPhysicalSize - 1)] = val;
+        NDS.Freeze.Store<u32>(&DTCM[addr & (DTCMPhysicalSize - 1)], val);
         return;
     }
 

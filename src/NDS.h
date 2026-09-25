@@ -38,6 +38,7 @@
 #include "GPU.h"
 #include "ARMJIT.h"
 #include "MemRegion.h"
+#include "MemoryFreeze.h"
 #include "ARMJIT_Memory.h"
 #include "ARM.h"
 #include "CRC32.h"
@@ -314,10 +315,31 @@ public: // TODO: Encapsulate the rest of these members
     u32 KeyInput;
     u16 RCnt;
 
+    // Bytes guest writes must not change (rtcv-ish HARD units).
+    MemoryFreeze Freeze;
+
     // Called at the start of every scanline when set, from inside
     // RunFrame() (rtcv-ish SCANLINE and HARD units).
     void (*ScanlineHook)(void* userdata, u32 line) = nullptr;
     void* ScanlineHookData = nullptr;
+
+    // val with the bytes frozen in the ARM9 VRAM view (0x06000000-0x067FFFFF)
+    // kept; addr is the ARM9 bus address.
+    template <typename T>
+    T FilterVRAMWrite9(u32 addr, T val)
+    {
+        if (!Freeze.Active())
+            return val;
+        return Freeze.FilterVRAM(addr & 0xFFFFFF, val, [&]() -> T {
+            switch (addr & 0x00E00000)
+            {
+            case 0x00000000: GPU.SyncVRAM_ABG(addr, false); return GPU.ReadVRAM_ABG<T>(addr);
+            case 0x00200000: GPU.SyncVRAM_BBG(addr, false); return GPU.ReadVRAM_BBG<T>(addr);
+            case 0x00400000: GPU.SyncVRAM_AOBJ(addr, false); return GPU.ReadVRAM_AOBJ<T>(addr);
+            default: GPU.SyncVRAM_BOBJ(addr, false); return GPU.ReadVRAM_BOBJ<T>(addr);
+            }
+        });
+    }
 
     // JIT MUST be declared before all other component objects,
     // as they'll need the memory that it allocates in its constructor!
