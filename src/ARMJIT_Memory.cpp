@@ -211,16 +211,21 @@ void ARMJIT_Memory::SigsegvHandler(int sig, siginfo_t* info, void* rawContext)
 
     ucontext_t* context = (ucontext_t*)rawContext;
 
-    FaultDescription desc {};
-    u8* curArea = (u8*)(NDS::Current->CurCPU == 0 ? NDS::Current->JIT.Memory.FastMem9Start : NDS::Current->JIT.Memory.FastMem7Start);
-
-    desc.EmulatedFaultAddr = (u8*)info->si_addr - curArea;
-    desc.FaultPC = (u8*)context->CONTEXT_PC;
-
-    if (FaultHandler(desc, *NDS::Current))
+    // A fault outside emulation (no console running yet) is not a fastmem
+    // access; dereferencing NDS::Current here would fault again forever.
+    if (NDS::Current)
     {
-        context->CONTEXT_PC = (u64)desc.FaultPC;
-        return;
+        FaultDescription desc {};
+        u8* curArea = (u8*)(NDS::Current->CurCPU == 0 ? NDS::Current->JIT.Memory.FastMem9Start : NDS::Current->JIT.Memory.FastMem7Start);
+
+        desc.EmulatedFaultAddr = (u8*)info->si_addr - curArea;
+        desc.FaultPC = (u8*)context->CONTEXT_PC;
+
+        if (FaultHandler(desc, *NDS::Current))
+        {
+            context->CONTEXT_PC = (u64)desc.FaultPC;
+            return;
+        }
     }
 
     struct sigaction* oldSa;
