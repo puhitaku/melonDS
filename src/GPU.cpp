@@ -314,7 +314,9 @@ void GPU::DoSavestate(Savestate* file) noexcept
 
 void GPU::SetRenderer(std::unique_ptr<Renderer>&& renderer) noexcept
 {
-    SyncAllVRAMCaptures();
+    // Pending captures live in the old renderer; there is none to sync from
+    // while the GPU is being constructed.
+    if (Rend) SyncAllVRAMCaptures();
 
     bool good = false;
     if (renderer)
