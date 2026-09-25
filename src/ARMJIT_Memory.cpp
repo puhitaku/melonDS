@@ -175,6 +175,10 @@ LONG ARMJIT_Memory::ExceptionHandler(EXCEPTION_POINTERS* exceptionInfo)
     {
         return EXCEPTION_CONTINUE_SEARCH;
     }
+    if (!NDS::Current)
+    {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
 
     u8* curArea = (u8*)(NDS::Current->CurCPU == 0 ? NDS::Current->JIT.Memory.FastMem9Start : NDS::Current->JIT.Memory.FastMem7Start);
     FaultDescription desc {};

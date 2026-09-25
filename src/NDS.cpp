@@ -138,6 +138,8 @@ NDS::~NDS() noexcept
 {
     UnregisterEventFuncs(Event_Div);
     UnregisterEventFuncs(Event_Sqrt);
+    // The fastmem fault handler dereferences Current; never leave it dangling.
+    if (Current == this) Current = nullptr;
     // The destructor for each component is automatically called by the compiler
 }
 
