@@ -314,6 +314,11 @@ public: // TODO: Encapsulate the rest of these members
     u32 KeyInput;
     u16 RCnt;
 
+    // Called at the start of every scanline when set, from inside
+    // RunFrame() (rtcv-ish SCANLINE and HARD units).
+    void (*ScanlineHook)(void* userdata, u32 line) = nullptr;
+    void* ScanlineHookData = nullptr;
+
     // JIT MUST be declared before all other component objects,
     // as they'll need the memory that it allocates in its constructor!
     // (Reminder: C++ fields are initialized in the order they're declared,

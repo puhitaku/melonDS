@@ -1336,6 +1336,9 @@ void GPU::StartScanline(u32 line) noexcept
     else
         DispStat[1] &= ~(1<<2);
 
+    if (NDS.ScanlineHook)
+        NDS.ScanlineHook(NDS.ScanlineHookData, VCount);
+
     NDS.ScheduleEvent(Event_LCD, true, HBLANK_CYCLES, LCD_StartHBlank, line);
 }
 
