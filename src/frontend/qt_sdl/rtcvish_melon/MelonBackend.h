@@ -87,8 +87,11 @@ public:
     bool setInput(const rtcvish::Input& input, rtcvish::Error& err) override;
     bool screenshot(std::vector<rtcvish::Image>& screens, rtcvish::Error& err) override;
     void quit() override;
+    void setFrozen(const std::vector<rtcvish::FrozenRange>& ranges) override;
 
 private:
+    static void scanlineHook(void* self, melonDS::u32 line);
+
     bool active() const;
     void updateRomPathFromInstance();
     const void* currentCart() const;

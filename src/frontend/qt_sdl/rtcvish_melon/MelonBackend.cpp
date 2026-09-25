@@ -25,6 +25,7 @@
 #include <chrono>
 #include <cstring>
 #include <exception>
+#include <map>
 
 #include "DSi.h"
 #include "EmuInstance.h"
@@ -178,6 +179,26 @@ u8* rawMemory(NDS* nds, Dom dom)
     }
 }
 
+// Host memory of the domains the guest writes through the bus, as seen by
+// MemoryFreeze. CartROM is not writable by the guest; VRAM is a view.
+const u8* guestWritable(NDS* nds, Dom dom, u32& size)
+{
+    switch (dom)
+    {
+    case Dom::MainRAM: size = nds->MainRAMMask + 1; return nds->MainRAM;
+    case Dom::Palette: size = kPaletteSize; return nds->GPU.Palette;
+    case Dom::OAM: size = kOAMSize; return nds->GPU.OAM;
+    case Dom::SharedWRAM: size = SharedWRAMSize; return nds->SharedWRAM;
+    case Dom::ARM7WRAM: size = ARM7WRAMSize; return nds->ARM7WRAM;
+    case Dom::ITCM: size = ITCMPhysicalSize; return nds->ARM9.ITCM;
+    case Dom::DTCM: size = DTCMPhysicalSize; return nds->ARM9.DTCM;
+    case Dom::NWRAM_A:
+    case Dom::NWRAM_B:
+    case Dom::NWRAM_C: size = NWRAMSize; return rawMemory(nds, dom);
+    default: return nullptr;
+    }
+}
+
 void invalidate(NDS* nds, Dom dom, u32 offset)
 {
 #ifdef JIT_ENABLED
@@ -300,6 +321,16 @@ void MelonBackend::applyInput(u32& keyMask, bool& touching, u16& touchX, u16& to
 void MelonBackend::beforeFrame()
 {
     server.runFrame();
+    // Installed per frame: the console object can be replaced, and the hook
+    // costs nothing while no SCANLINE or HARD unit executes.
+    NDS* nds = inst->nds;
+    nds->ScanlineHook = server.scheduler().scanlineActive() ? &MelonBackend::scanlineHook : nullptr;
+    nds->ScanlineHookData = this;
+}
+
+void MelonBackend::scanlineHook(void* self, u32)
+{
+    static_cast<MelonBackend*>(self)->server.runScanline();
 }
 
 void MelonBackend::afterFrame()
@@ -337,6 +368,10 @@ rtcvish::Info MelonBackend::hello()
     info.capabilities.input = true;
     info.capabilities.loadRom = true;
     info.capabilities.reset = true;
+    info.capabilities.scanlineUnits = true;
+    // Holds with and without the JIT: frozen fastmem pages are
+    // write-protected so compiled code takes the intercepted slow path.
+    info.capabilities.hardUnits = true;
     return info;
 }
 
@@ -632,6 +667,34 @@ bool MelonBackend::screenshot(std::vector<rtcvish::Image>& screens, rtcvish::Err
         screens.push_back(std::move(img));
     }
     return true;
+}
+
+void MelonBackend::setFrozen(const std::vector<rtcvish::FrozenRange>& ranges)
+{
+    if (!active()) return;
+
+    NDS* nds = inst->nds;
+    std::map<Dom, std::vector<MemoryFreeze::Range>> byDomain;
+    for (const auto& r : ranges)
+    {
+        u32 start = u32(r.address);
+        byDomain[domainByName(r.domain)].push_back({start, start + u32(r.value.size())});
+    }
+
+    nds->Freeze.Clear();
+    for (auto& [dom, list] : byDomain)
+    {
+        if (dom == Dom::VRAM)
+        {
+            nds->Freeze.SetVRAM(std::move(list));
+            continue;
+        }
+        u32 size = 0;
+        if (const u8* base = guestWritable(nds, dom, size)) nds->Freeze.SetHost(base, size, std::move(list));
+    }
+#ifdef JIT_ENABLED
+    nds->JIT.Memory.RefreshFreezeProtection();
+#endif
 }
 
 void MelonBackend::quit()
