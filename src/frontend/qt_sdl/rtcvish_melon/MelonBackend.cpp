@@ -24,6 +24,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <exception>
 
 #include "DSi.h"
 #include "EmuInstance.h"
@@ -503,9 +504,44 @@ bool MelonBackend::loadRom(const std::string& path, rtcvish::Error& err)
     QString setupError = inst->verifySetup();
     if (!setupError.isEmpty()) return err.set(rtcvish::ErrorCode::Failed, setupError.toStdString());
 
+    // Same transitions as the UI's Open ROM, which pauses before booting:
+    // silence audio while the console may be replaced, since the SDL audio
+    // callback reads inst->nds from its own thread.
+    bool wasRunning = thread->emuActive && thread->emuStatus != EmuThread::emuStatus_Paused;
+    inst->audioDisable();
+
     QString loadError;
-    if (!inst->loadROM(QStringList{qpath}, true, loadError))
+    bool loaded = false;
+    try
+    {
+        loaded = inst->loadROM(QStringList{qpath}, true, loadError);
+    }
+    catch (const std::exception& e)
+    {
+        loadError = QString("exception while loading the ROM: ") + e.what();
+    }
+    catch (...)
+    {
+        loadError = "unknown exception while loading the ROM";
+    }
+
+    if (!loaded || !inst->nds)
+    {
+        if (loadError.isEmpty()) loadError = "Failed to load the DS ROM.";
+        // A console left half-built must not be run; otherwise keep running
+        // the previous game, as the UI does after a failed Open ROM.
+        if (!inst->nds)
+        {
+            if (thread->emuActive) thread->stopNow(false);
+            onConsoleStopped();
+            romPath.clear();
+        }
+        else if (wasRunning)
+        {
+            inst->audioEnable();
+        }
         return err.set(rtcvish::ErrorCode::Failed, loadError.toStdString());
+    }
 
     inst->nds->Start();
     thread->runNow();
